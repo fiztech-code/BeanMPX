@@ -26,7 +26,7 @@ There is one optional parameter which can be set, its the Acknowledge Messages.
 BeanMPX can send acknowledge response to messages with a particular destination id. 
 
 ```C++
-  bean.ackMsg((const uint8_t[]) {0x44, 0x53}); // Messages to acknowledge
+  bean.ackMsg((const uint8_t[]) {0xFE}); // Messages to acknowledge
 ```
 Bean Multiplex repeated the message 3 times if no acknowledgement was received 
 ![bean-mpx_serial-monitor.png](bean-mpx_serial-monitor.png)
