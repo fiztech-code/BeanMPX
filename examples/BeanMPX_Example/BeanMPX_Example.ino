@@ -15,7 +15,7 @@ uint8_t batt[] = {0x62, 0xD4, 0x28}; // DOOR-FLASH, BATT, OIL D0 -111---- (64, 3
 uint8_t door[] = {0x62, 0xFA, 0xff}; // DOOR-FLASH D0 11111111 (255); *important mid:0xD4 D0:0x28 D0 -1------ must be set first
 
 void setup() {
-  bean.ackMsg((const uint8_t[]) {0x44, 0x53}); // Messages to acknowledge
+  bean.ackMsg((const uint8_t[]) {0xFE}); // Messages to acknowledge
   bean.begin();  
   
   Serial.begin(115200);
