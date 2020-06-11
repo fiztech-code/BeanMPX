@@ -1,0 +1,24 @@
+#######################################
+# Syntax Coloring Map For BeanMPX
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+BeanMPX	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+read KEYWORD2
+write KEYWORD2
+available KEYWORD2
+
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+BEAN_FRAME_LENGTH LITERAL1
