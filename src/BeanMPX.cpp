@@ -154,7 +154,7 @@ void BeanMPX::receive() {
       }
       if (d == 0x7E) {
         for (int a = 0; a < sizeof(acknowledge_did); a++) {
-          if (_receive_buffer[1] == acknowledge_did[a]) {			 
+          if (_receive_buffer[2] == acknowledge_did[a]) {			 
             is_transmit_ack = true;
             a = sizeof(acknowledge_did);
           }
@@ -435,7 +435,7 @@ void BeanMPX::begin() {
 }
 
 void BeanMPX::ackMsg(const uint8_t *destintion_id) {
-	memcpy(acknowledge_did, destintion_id, sizeof(destintion_id));	
+	memcpy(acknowledge_did, destintion_id, sizeof(acknowledge_did));	
 }
 
 // Read from buffer
