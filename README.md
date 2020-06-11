@@ -11,7 +11,7 @@ The ecu is responsible to feed information to the combination meter, if say the 
 
 ## Circuit
 
-Here is an example circuits to use for transmit/receive, the MCP2514 module integration can be ignored
+Here is an example circuits to use for transmit/receive, the MCP2515 module integration can be ignored
 ![bean-mpx_circuit](bean-mpx_circuit.png)
 
 
