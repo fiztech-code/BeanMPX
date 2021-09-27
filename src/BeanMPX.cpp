@@ -457,7 +457,7 @@ void BeanMPX::sendMsg(const uint8_t *data, uint16_t datalen) {
   frame[datalen + 1] = gencrc(frame, datalen + 1); // CRC
   frame[datalen + 2] = 0x7e; // EOF
 
-  for (uint8_t i = sizeof(frame)-2; i > 0; i--) {
+  for (uint8_t i = sizeof(frame)-1; i > 0; i--) {
     frame[i] = frame[i - 1];
   }
 
