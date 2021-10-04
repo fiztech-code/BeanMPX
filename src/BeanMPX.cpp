@@ -81,6 +81,11 @@ void BeanMPX::storeReceivedByte() {
   d = 0;
   i = 0x80;
   _buffer_index++;
+  if (_buffer_index > BUFFER_SIZE) {
+    _buffer_index = 0;
+    is_listining = false;
+    msg_stage = 0;	
+  }
 }
 
 
