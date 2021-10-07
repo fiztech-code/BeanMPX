@@ -15,7 +15,9 @@ BeanMPX	KEYWORD1
 read KEYWORD2
 write KEYWORD2
 available KEYWORD2
-
+ackMsg KEYWORD2
+msgType KEYWORD2
+isBusy KEYWORD2
 
 #######################################
 # Constants (LITERAL1)
