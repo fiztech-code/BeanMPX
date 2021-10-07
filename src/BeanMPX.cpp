@@ -1,6 +1,3 @@
-#define RX 8
-#define TX 9
-
 // 
 // Includes
 //
@@ -11,6 +8,7 @@
 // Statics
 //
 BeanMPX *BeanMPX::active_object = 0;
+BeanMPX *BeanMPX::active_object2 = 0;
 
 #ifdef _DEBUG
 uint8_t debug_pin1 = (1<<PD3); // pin 3
@@ -82,7 +80,7 @@ void BeanMPX::storeReceivedByte() {
   i = 0x80;
   _buffer_index++;
   if (_buffer_index > BUFFER_SIZE) {
-    _buffer_index = 0;
+	_buffer_index = 0;
     is_listining = false;
     msg_stage = 0;	
   }
@@ -98,7 +96,7 @@ void BeanMPX::receive() {
   }
 
   uint8_t rx_pin_val;
-  rx_pin_val = (PINB & BeanMPX::_receiveBitMask);
+  rx_pin_val = *_receivePortRegister & _receiveBitMask;
 
   switch (msg_stage) {
   case 0:
@@ -118,7 +116,9 @@ void BeanMPX::receive() {
       if (msg_length > 13) {
         msg_stage = 0;
         is_listining = false;
-        TIMSK1 = 0;
+		
+        *_timerInterruptMaskRegister = 0; // disable timer interrupts
+		
         _buffer_index = 0;
       }
       storeReceivedByte();
@@ -175,7 +175,9 @@ void BeanMPX::receive() {
 
     if (!i || (i & 0x1f) > 0) {
       storeReceivedByte();
-      TIMSK1 = 0;
+      
+	  *_timerInterruptMaskRegister = 0; // disable timer interrupt
+	  
       msg_stage = 0;
       is_listining = false;
 
@@ -195,7 +197,7 @@ void BeanMPX::receiveAcknowledge() {
   if (!is_receive_ack) return;
 
   uint8_t rx_pin_val;
-  rx_pin_val = (PINB & _receiveBitMask);
+  rx_pin_val = *_receivePortRegister & _receiveBitMask;
 
   if (rx_pin_val) {
     rsp |= k;
@@ -239,9 +241,9 @@ void BeanMPX::transmit() {
       if (is_transmitting) {
         is_transmitting = false;
         if (!is_listining) {
-          TIMSK1 = 0;
+          *_timerInterruptMaskRegister = 0; // disable timer interrupt
         }
-        PORTB &= ~_transmitBitMask; // safety
+        *_transmitPortRegister |= _transmitBitMask; // safety
       }
       return;
     }
@@ -255,17 +257,17 @@ void BeanMPX::transmit() {
   if (_tx_buffer_index < _tx_buffer_len - 1 && (tx_s0 == 5 || tx_s1 == 5)) {
     j <<= 1;
     if (tx_s0 == 5) {
-	  tx_pin_val = 0; // bug fix to count stuffing bit	        
-      PORTB &= ~_transmitBitMask;
+	  tx_pin_val = 0; // bug fix to count stuffing bit	              
+	  *_transmitPortRegister |= _transmitBitMask;
     } else {
 	  tx_pin_val = 1; // bug fix to count stuffing bit	  
-      PORTB |= _transmitBitMask;
+      *_transmitPortRegister &= ~_transmitBitMask;
     }
   } else {
     if (tx_pin_val) {
-      PORTB |= _transmitBitMask;
-    } else {
-      PORTB &= ~_transmitBitMask;
+      *_transmitPortRegister &= ~_transmitBitMask;
+    } else {      
+	  *_transmitPortRegister |= _transmitBitMask;
     }
   }
 
@@ -288,22 +290,21 @@ void BeanMPX::transmitAcknowledge() {
   if (!is_transmit_ack) {
     return;
   }
-
+  
   uint8_t tx_pin_val;
   tx_pin_val = ack & l;
-
+  
   if (tx_pin_val) {
-    PORTB |= _transmitBitMask;
+	*_transmitPortRegister &= ~_transmitBitMask;   
   } else {
-    PORTB &= ~_transmitBitMask;
-  }
+	*_transmitPortRegister |= _transmitBitMask;  
+  }  
 
   l >>= 1;
-
   if (!l || (l & 0x1f) > 0) {
     is_transmit_ack = false;
-    l = 0x80;
-    PORTB &= ~_transmitBitMask; // safety   
+    l = 0x80; 
+	*_transmitPortRegister |= _transmitBitMask; // safety, Set TX HIGH 
   }
 }
 
@@ -313,15 +314,31 @@ void BeanMPX::transmitAcknowledge() {
 //
 void BeanMPX::syncPulse() {
   uint8_t rx_pin_val;
-  rx_pin_val = PINB & _receiveBitMask; // RX pin is 8
+  rx_pin_val = *_receivePortRegister & _receiveBitMask; 
 
   if (!is_listining && rx_pin_val && !is_transmitting) {
     msg_stage = 0;
     i = 2;
     is_listining = true;
-    TIMSK1 |= (1 << OCIE1A) | (1 << OCIE1B);
+	
+	*_timerInterruptMaskRegister |= _timerInterruptMask; // enable timer interrupts	
   }
-  TCNT1 = 830;
+    
+  if (rx_pin_val != _rx_prev_val) {
+	_rx_prev_val = rx_pin_val;
+	setTimerCounter();  
+  }  
+}
+
+// 
+//  set timer counter
+//
+void BeanMPX::setTimerCounter() {
+	if (_use_timer2) {
+		TCNT2 = 104;		
+	} else {
+		TCNT1 = 830;
+	}
 }
 
 
@@ -338,52 +355,92 @@ void BeanMPX::pciSetup(byte pin) {
 //
 // Static handle functions
 //
+// handle timer1
 inline void BeanMPX::handle_rx() {
   if (active_object) {
     active_object->receive();	
-  }  
+  }    
 }
 inline void BeanMPX::handle_rx_ack() {
   if (active_object) {
     active_object->receiveAcknowledge();	
-  }  
+  }     
 }
 
 inline void BeanMPX::handle_tx() {
   if (active_object) {
     active_object->transmit();	
-  }  
+  }   
 }
-inline void BeanMPX::handle_tx_ack() {
+inline void BeanMPX::handle_tx_ack() {  
   if (active_object) {
     active_object->transmitAcknowledge();	
-  }  
+  }     
 }
 
+// handler timer2
+inline void BeanMPX::handle_rx2() {
+  if (active_object2) {
+    active_object2->receive();	
+  }    
+}
+inline void BeanMPX::handle_rx_ack2() {
+  if (active_object2) {
+    active_object2->receiveAcknowledge();	
+  }     
+}
+
+inline void BeanMPX::handle_tx2() {
+  if (active_object2) {
+    active_object2->transmit();	
+  }   
+}
+inline void BeanMPX::handle_tx_ack2() { 
+  if (active_object2) {
+    active_object2->transmitAcknowledge();	
+  }     
+}
+
+// handle pin interrupt
 inline void BeanMPX::handle_sync() {	
-  if (active_object) {
-    active_object->syncPulse();	
-  }  
+  if (active_object) {	
+	active_object->syncPulse();			
+  }
+  if (active_object2) {
+    active_object2->syncPulse();	
+  } 
 }
 
 //
 // Interrupt handling
 //
-ISR(TIMER1_COMPA_vect) {
+ISR(TIMER1_COMPA_vect) { 
   #ifdef _DEBUG
   PORTD ^= debug_pin1;
-  #endif
+  #endif 	 
   BeanMPX::handle_rx();
   BeanMPX::handle_rx_ack();
 }
 
-ISR(TIMER1_COMPB_vect) {
+ISR(TIMER1_COMPB_vect) {  
   #ifdef _DEBUG
   PORTD ^= debug_pin2;
-  #endif
+  #endif 	 
   BeanMPX::handle_tx();
   BeanMPX::handle_tx_ack();
 }
+
+
+ISR(TIMER2_COMPA_vect) { 
+  BeanMPX::handle_rx2();
+  BeanMPX::handle_rx_ack2();
+}
+
+ISR(TIMER2_COMPB_vect) {  
+  BeanMPX::handle_tx2();
+  BeanMPX::handle_tx_ack2();
+}
+
 
 ISR(PCINT0_vect) {
   #ifdef _DEBUG
@@ -392,6 +449,18 @@ ISR(PCINT0_vect) {
   BeanMPX::handle_sync();  
 }
 
+#if defined(PCINT1_vect)
+ISR(PCINT1_vect, ISR_ALIASOF(PCINT0_vect));
+#endif
+
+#if defined(PCINT2_vect)
+ISR(PCINT2_vect, ISR_ALIASOF(PCINT0_vect));
+#endif
+
+#if defined(PCINT3_vect)
+ISR(PCINT3_vect, ISR_ALIASOF(PCINT0_vect));
+#endif
+
 BeanMPX::BeanMPX() {
   // set acknowledge DIDs?
 }
@@ -399,32 +468,64 @@ BeanMPX::BeanMPX() {
 //
 // Public methods
 //
-void BeanMPX::begin() {	
+void BeanMPX::begin(uint8_t rx, uint8_t tx, bool use_timer2 = false) {	  
   #ifdef _DEBUG
   DDRD |= (1<<PD3) | (1<<PD4) | (1<<PD5);	// Debug Pins
   #endif
   
-  // Init Timer1  
-  TCCR1A = 0;
-  TCCR1B = 0;
-  TCCR1B |= (1 << CS10) | (1 << WGM12);	// prescaler 1, CTC Mode
-  OCR1B = 830;
-  OCR1A = 1660;
-  TIMSK1 = 0;    
+  _use_timer2 = use_timer2;
+   
+  if (_use_timer2) {
+	// Init Timer2 
+	TCCR2A = 0;
+	TCCR2A |= (1 << WGM21); // CTC Mode 
+	TCCR2B = 0;
+	TCCR2B |= (1 << CS21); // prescaler 8
+	OCR2A = 208;
+	OCR2B = 104; 
+	TIMSK2 = 0; 
+		
+	_timerInterruptMaskRegister = &TIMSK2;
+	_timerInterruptMask = (1 << OCIE2A) | (1 << OCIE2B);	
+  } else {
+	// Init Timer1  
+	TCCR1A = 0;
+	TCCR1B = 0;
+	TCCR1B |= (1 << CS10) | (1 << WGM12);	// prescaler 1, CTC Mode
+	OCR1B = 830;
+	OCR1A = 1660;
+	TIMSK1 = 0; 
+	
+	_timerInterruptMaskRegister = &TIMSK1;
+	_timerInterruptMask = (1 << OCIE1A) | (1 << OCIE1B);
+  }
   
-  // Transmit pin as outout
-  DDRB |= (1<<TX);	// RX/TX pins  	
-
-  // Receive pin as interupt 	
-  pciSetup(RX);
-  _receiveBitMask = digitalPinToBitMask(RX);
-  _transmitBitMask = digitalPinToBitMask(TX);  
+ 
+  // set RX pin
+  pinMode(rx, INPUT);
+  _receivePin = rx;
+  _receiveBitMask = digitalPinToBitMask(rx);
+  uint8_t port = digitalPinToPort(rx);
+  _receivePortRegister = portInputRegister(port);  
+  pciSetup(rx); // rx pin as interupt 	  
+ 
+    
+  // set TX pin
+  pinMode(tx, OUTPUT);
+  _transmitBitMask = digitalPinToBitMask(tx);   
+  uint8_t port2 = digitalPinToPort(tx);
+  _transmitPortRegister = portOutputRegister(port2);
+  *_transmitPortRegister |= _transmitBitMask; // set tx pin HIGH
   
-  active_object = this;
+  if (_use_timer2) {
+	active_object2  = this;
+  } else {  
+	active_object = this; 
+  }
 }
 
-void BeanMPX::ackMsg(const uint8_t *destintion_id) {
-	memcpy(acknowledge_did, destintion_id, sizeof(acknowledge_did));	
+void BeanMPX::ackMsg(const uint8_t *destintion_id, uint8_t len) {	
+	memcpy(acknowledge_did, destintion_id, len);	
 }
 
 // Read from buffer
@@ -432,9 +533,11 @@ uint8_t BeanMPX::available() {
 	return msg_len - msg_index;	
 }
 
+
 char BeanMPX::msgType() {
 	return msg_type;	
 }
+
 
 uint8_t BeanMPX::read() {		
 	if (msg_index == msg_len) {		
@@ -445,8 +548,6 @@ uint8_t BeanMPX::read() {
 	msg_index = (msg_index + 1) % BUFFER_SIZE;
 	return d;
 }
-
-
 
 
 void BeanMPX::sendMsg(const uint8_t *data, uint16_t datalen) {  
@@ -473,7 +574,7 @@ void BeanMPX::sendMsg(const uint8_t *data, uint16_t datalen) {
   _tx_buffer_index = 0;
 
   j = 1;
-
-  TCNT1 = 830;
-  TIMSK1 |= (1 << OCIE1A) | (1 << OCIE1B);
+  
+  setTimerCounter(); // set timer counter sync 	
+  *_timerInterruptMaskRegister |= _timerInterruptMask; // enable timer interrupt
 }

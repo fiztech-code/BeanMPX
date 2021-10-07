@@ -8,9 +8,8 @@
 * Definitions
 ******************************************************************************/
 
-#define RX 8
-#define TX 9
 #define BUFFER_SIZE 18
+#define BEAN_FRAME_LENGTH 18
 
 // using progmem for CRC to save memory
 // CRC: Polynomial = 8X + 4X + X + 1
@@ -34,6 +33,26 @@ const PROGMEM uint8_t crctable[] = {
 
 class BeanMPX {
 	private: 
+		// per object data
+		uint8_t _rx_prev_val;
+		uint8_t _receivePin;
+		uint8_t _receiveBitMask;
+		volatile uint8_t *_receivePortRegister;
+		
+		uint8_t _transmitBitMask;
+		volatile uint8_t *_transmitPortRegister;
+		
+		volatile uint8_t *_pcint_maskreg;
+		uint8_t _pcint_maskvalue;
+		
+		// timer registers
+		volatile uint16_t *_timerCountRegister;	
+		uint16_t _timerCompareValue;
+		volatile uint8_t *_timerInterruptMaskRegister;	
+	    uint8_t _timerInterruptMask;	
+		bool _use_timer2;
+		
+	
 		// Receive vars		
 		// stages of frame
 		volatile uint8_t msg_stage = 0;
@@ -47,42 +66,51 @@ class BeanMPX {
 		  6 - EOF                 // end of frame ( 6 bits: 000000 )
 		*/
 		volatile bool is_listining = false;
+		volatile bool ignore_pulse = false;
 		volatile uint8_t _receive_buffer[BUFFER_SIZE];
 		volatile uint8_t _buffer_index = 0;
 		volatile bool _buffer_overflow = false;
-		volatile uint8_t d = 0, s0 = 0, s1 = 0; // s0 and s1 - Consecutive bit counters for Stuffing Bits
-		volatile uint16_t i = 0x80;
-		volatile uint8_t msg_length = 0;
-		uint8_t _receiveBitMask;
+		volatile uint8_t d = 0; // rx data byte
+		volatile uint8_t s0 = 0, s1 = 0; // rx_s0 and rx_s1 - Consecutive bit counters for Stuffing Bits
+		volatile uint16_t i = 1; //0x80; // rx bit iterator
+		volatile uint8_t msg_length = 0;		
+		
 
 		// Transmit vars
-		volatile uint8_t tx_msg_stage = 0;
-		uint8_t _transmitBitMask;
+		volatile uint8_t tx_msg_stage = 0;		
 		volatile bool is_transmitting = false;
 		volatile uint8_t _transmit_buffer[BUFFER_SIZE];
 		volatile uint8_t _tx_buffer_index = 0;
 		volatile uint8_t _tx_buffer_len = 0;
+		
+		volatile uint8_t _tx_byte_index = 0;
+		volatile uint8_t _tx_byte_val = 0;
+		volatile uint8_t _tx_bit_index = 7;
+		volatile uint8_t _tx_bit_count = 0;	
+		
 		volatile uint8_t tx_s0 = 0, tx_s1 = 0; // ts0 and ts1 - Consecutive bit counters for Stuffing Bits
-		volatile uint16_t j = 0x80;
+		volatile uint16_t j = 0x80; // tx bit iterator
 		volatile uint8_t tx_retry = 2;
 
 		// Acknowledge vars
 		uint8_t acknowledge_did[10];
 		volatile bool is_receive_ack = false;
 		volatile uint8_t rsp = 0;
-		volatile uint16_t k = 0x80;
+		volatile uint16_t k = 0x80; // ack bit iterator
 		volatile bool is_transmit_ack = false;
 		volatile uint8_t ack = 0x40;
 		volatile uint16_t l = 0x80;
 
 		// static data
 		static BeanMPX *active_object;	
+		static BeanMPX *active_object2;	
 		
 		// Output data		
 		uint8_t msg[BUFFER_SIZE];
 		uint8_t msg_index = _buffer_index;
 		uint8_t msg_len = _buffer_index;
 		char msg_type;
+		
 	private:		
 		// private methods
 		void pciSetup(byte pin);		
@@ -95,35 +123,45 @@ class BeanMPX {
 		void receive();
 		void receiveAcknowledge();
 		
+		
+		void storeTxBit(uint8_t bit_val);
 		void transmit();
 		void transmitAcknowledge();
 		
 		void syncPulse();		
+		void setTimerCounter();	
 		
-public:
-  // public methods
-  BeanMPX();  
-  
-  void begin();
-  void ackMsg(const uint8_t *data);
-  void ackMessages();
-  
-  void sendMsg(const uint8_t *data, uint16_t datalen);
-  
-  bool isBusy() { 
-	return is_listining || is_transmitting; 
-  }
-    
-  virtual uint8_t available();
-  virtual char msgType();
-  virtual uint8_t read();
-  
-  // handlers
-  static inline void handle_rx();
-  static inline void handle_rx_ack();  
-  static inline void handle_tx();
-  static inline void handle_tx_ack();  
-  static inline void handle_sync();
+	public:
+		// public methods
+		BeanMPX();  
+
+		void begin(uint8_t rx, uint8_t tx, bool use_timer2 = false);
+		void ackMsg(const uint8_t *data, uint8_t len);
+
+		void sendMsg(const uint8_t *data, uint16_t datalen);
+		void sendMessage(const uint8_t *data, uint16_t datalen);
+
+		bool isBusy() { 
+			return is_listining || is_transmitting; 
+		}
+
+		virtual uint8_t available();
+		virtual char msgType();
+		virtual uint8_t read();
+
+		// handlers
+		static inline void handle_rx();
+		static inline void handle_rx_ack();  
+		static inline void handle_tx();
+		static inline void handle_tx_ack();  
+
+		static inline void handle_rx2();
+		static inline void handle_rx_ack2();  
+		static inline void handle_tx2();
+		static inline void handle_tx_ack2();
+
+		static inline void handle_sync(); 
+		
 };
 
 #endif
