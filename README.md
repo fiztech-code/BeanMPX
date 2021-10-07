@@ -8,7 +8,7 @@ Bean muliplex is a communication protocol developed by Toyota for body control s
 The ecu is responsible to feed information to the combination meter, if say the ecu was replaced for an aftermarket unit the temperature gauge will not work.
 
 #### Demo: https://youtu.be/FXD5fauDTvY
-#### Bridge: https://www.youtu.be/dopTZ3F5d6s
+#### Bridge: https://youtu.be/dopTZ3F5d6s
 
 ## Circuit
 
