@@ -23,8 +23,8 @@ Next open the example sketch provided.
 
 
 ### Init
-There is one optional parameter which can be set, its the Acknowledge Messages.
-BeanMPX can send acknowledge response to messages with a particular destination id. 
+There is optional parameter which can be set, its the Acknowledge Messages.
+BeanMPX can send acknowledge response to messages with a particular destination id. With bean.begin() function you can specify which pins to use for rx/tx also you can also set to use timer1(16bit) or timer2(8bit)
 
 ```C++
   bean.ackMsg((const uint8_t[]) {0xFE}, 1); // Acknowledge Messages, Length
