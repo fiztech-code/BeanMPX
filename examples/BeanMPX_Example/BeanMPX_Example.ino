@@ -20,7 +20,7 @@ void setup() {
   Serial.println("BeanMPX");
   
   bean.ackMsg((const uint8_t[]) {0xFE}, 1); // Acknowledge Messages, Length  
-  bean.begin();  
+  bean.begin(8, 9);  
 }
 
 void loop() {  
