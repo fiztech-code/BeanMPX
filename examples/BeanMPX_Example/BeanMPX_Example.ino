@@ -1,7 +1,8 @@
 #include <BeanMPX.h>
 
+#define RX_BUFFER_SIZE 18
+
 BeanMPX bean;
-uint32_t timer = 0;
 
 // Messages           {DID,  MID,  DAT0, DAT1, DAT2}
 uint8_t fuel[] =      {0x62, 0xA4, 0x3C}; // Fuel D0 153-40 
@@ -14,31 +15,51 @@ uint8_t seatBelt[] =  {0x62, 0xDF, 0x10, 0x80}; // DOOR D0 ---1---- (16);  SEAT 
 uint8_t batt[] = {0x62, 0xD4, 0x28}; // DOOR-FLASH, BATT, OIL D0 -111---- (64, 32, 16) 
 uint8_t door[] = {0x62, 0xFA, 0xff}; // DOOR-FLASH D0 11111111 (255); *important mid:0xD4 D0:0x28 D0 -1------ must be set first //
 
+uint32_t timer = 0;
+uint32_t current_millis = 0;
+uint8_t bean_rx_buffer[RX_BUFFER_SIZE];
+uint8_t bean_rx_index = 0;
+
 void setup() {
   Serial.begin(115200);
   while (!Serial) {;}  
   Serial.println("BeanMPX");
   
   bean.ackMsg((const uint8_t[]) {0xFE}, 1); // Acknowledge Messages, Length  
-  bean.begin(8, 9);  
+  bean.begin(8, 9);
 }
 
-void loop() {  
-  if (bean.available()) {
-    Serial.print(bean.msgType()); 
-    Serial.print(" ");    
-    while (bean.available()) {      
-      Serial.print(bean.read(), HEX); 
-      Serial.print(" ");    
+void loop() { 
+  current_millis = millis();
+   
+  if (bean.available()) {       
+    while (bean.available()) { 
+      bean_rx_buffer[bean_rx_index++] = bean.read();
+      if (bean_rx_index > RX_BUFFER_SIZE) { // safety
+        bean_rx_index = 0;
+      }              
     }
-    Serial.print("\n");    
+
+    Serial.print(bean.msgType()); 
+    Serial.print(" "); 
+    for (int i = 0; i < bean_rx_index; i++) {
+      if (bean_rx_buffer[i] < 0x10) {
+        Serial.print(0, HEX); 
+      }
+      Serial.print(bean_rx_buffer[i], HEX); 
+      Serial.print(" ");    
+    }    
+    Serial.print("\n");
+    
+    bean_rx_index = 0;    
+    memset(bean_rx_buffer, 0, RX_BUFFER_SIZE); 
   }
 
-
-   if (timer < millis()) {
+  
+  if (current_millis - timer > 1000) {
     if (!bean.isBusy()) {      
-      bean.sendMsg(engTemp, sizeof(engTemp));
-      timer = millis() + 1000;
+      bean.sendMsg(gear, sizeof(gear));
+      timer = current_millis;
     }    
   }
   
