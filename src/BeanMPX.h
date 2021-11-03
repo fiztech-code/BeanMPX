@@ -8,6 +8,7 @@
 * Definitions
 ******************************************************************************/
 
+#define MAILBOX_SIZE 8
 #define BUFFER_SIZE 18
 #define BEAN_FRAME_LENGTH 18
 
@@ -76,7 +77,7 @@ class BeanMPX {
 		volatile uint8_t msg_length = 0;		
 		
 
-		// Transmit vars
+		// Transmit vars		
 		volatile uint8_t tx_msg_stage = 0;		
 		volatile bool is_transmitting = false;
 		volatile uint8_t _transmit_buffer[BUFFER_SIZE];
@@ -100,13 +101,17 @@ class BeanMPX {
 		volatile bool is_transmit_ack = false;
 		volatile uint8_t ack = 0x40;
 		volatile uint16_t l = 0x80;
+		bool _inverse_tx = false;
 
 		// static data
 		static BeanMPX *active_object;	
 		static BeanMPX *active_object2;	
 		
 		// Output data		
-		uint8_t msg[BUFFER_SIZE];
+		uint8_t mailbox[MAILBOX_SIZE][BUFFER_SIZE] = {0};
+		//uint8_t mailbox_index = 0; 
+		uint8_t mailbox_fill_level = 0; 
+		uint8_t msg[BUFFER_SIZE] = {0};
 		uint8_t msg_index = _buffer_index;
 		uint8_t msg_len = _buffer_index;
 		char msg_type;
@@ -119,23 +124,24 @@ class BeanMPX {
 		uint8_t checkcrc(uint8_t bytes[], uint8_t length);
 		
 		void storeReceivedBit(uint8_t rx_pin_val, bool no_stuffing_bit = false);
-		void storeReceivedByte();		
+		void storeReceivedByte();	
+		void storeMessage(uint8_t *msg, uint8_t len);
 		void receive();
-		void receiveAcknowledge();
-		
+		void receiveAcknowledge();		
 		
 		void storeTxBit(uint8_t bit_val);
 		void transmit();
 		void transmitAcknowledge();
 		
-		void syncPulse();		
+		void syncPulse();	
+		void txSafetyState();
 		void setTimerCounter();	
 		
 	public:
 		// public methods
 		BeanMPX();  
 
-		void begin(uint8_t rx, uint8_t tx, bool use_timer2 = false);
+		void begin(uint8_t rx, uint8_t tx, bool use_timer2 = false, bool inverse_tx = false);
 		void ackMsg(const uint8_t *data, uint8_t len);
 
 		void sendMsg(const uint8_t *data, uint16_t datalen);
@@ -146,8 +152,10 @@ class BeanMPX {
 		}
 
 		virtual uint8_t available();
+		virtual uint8_t available2();
 		virtual char msgType();
 		virtual uint8_t read();
+		void getMessage(uint8_t *buffer, uint16_t buffer_len);
 
 		// handlers
 		static inline void handle_rx();
