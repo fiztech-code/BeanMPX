@@ -1,6 +1,7 @@
 #include <BeanMPX.h>
 
-#define RX_BUFFER_SIZE 18
+// RX: Len MsgType SOF DID MID DAT0 ... CRC EOM EOF
+#define RX_BUFFER_SIZE 20
 
 BeanMPX bean;
 
@@ -19,6 +20,7 @@ uint32_t timer = 0;
 uint32_t current_millis = 0;
 uint8_t bean_rx_buffer[RX_BUFFER_SIZE];
 uint8_t bean_rx_index = 0;
+uint8_t g = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -31,36 +33,32 @@ void setup() {
 
 void loop() { 
   current_millis = millis();
-   
-  if (bean.available()) {       
-    while (bean.available()) { 
-      bean_rx_buffer[bean_rx_index++] = bean.read();
-      if (bean_rx_index > RX_BUFFER_SIZE) { // safety
-        bean_rx_index = 0;
-      }              
-    }
 
-    Serial.print(bean.msgType()); 
-    Serial.print(" "); 
-    for (int i = 0; i < bean_rx_index; i++) {
+  if (bean.available()) {
+    bean.getMsg(bean_rx_buffer, RX_BUFFER_SIZE);
+
+    Serial.print((char)bean_rx_buffer[1]); 
+    Serial.print(" ");
+    for (int i = 2; i < bean_rx_buffer[0]+2; i++) {
       if (bean_rx_buffer[i] < 0x10) {
         Serial.print(0, HEX); 
       }
       Serial.print(bean_rx_buffer[i], HEX); 
       Serial.print(" ");    
     }    
-    Serial.print("\n");
-    
-    bean_rx_index = 0;    
+    Serial.print("\n");    
     memset(bean_rx_buffer, 0, RX_BUFFER_SIZE); 
-  }
-
+  }  
   
   if (current_millis - timer > 1000) {
     if (!bean.isBusy()) {      
       bean.sendMsg(gear, sizeof(gear));
+      gear[3] = 1 << g;
+      g++;
+      if (g > 4) {
+        g = 0;
+      }
       timer = current_millis;
     }    
-  }
-  
+  }  
 }
