@@ -95,7 +95,7 @@ void BeanMPX::storeMessage(uint8_t *msg, uint8_t len, uint8_t msg_type) { // Sto
   }
 }
 
-void BeanMPX::getMessage(uint8_t *buffer, uint8_t buffer_len) {	
+void BeanMPX::getMsg(uint8_t *buffer, uint8_t buffer_len) {	
 	memcpy(buffer, mailbox[0], buffer_len); // get first from mail box
 	
 	for (int i = 0; i < mailbox_fill_level && i < MAILBOX_SIZE; i++) { // shift all messages up
@@ -274,33 +274,18 @@ void BeanMPX::transmit() {
 
   uint8_t tx_pin_val;
   tx_pin_val = _transmit_buffer[_tx_buffer_index] & j;
-  
-  uint8_t _tx_pin_val = tx_pin_val;
-  if (_inverse_tx) {
-	_tx_pin_val = !_tx_pin_val;  
-  }
 
   if (_tx_buffer_index < _tx_buffer_len - 1 && (tx_s0 == 5 || tx_s1 == 5)) {
     j <<= 1;
     if (tx_s0 == 5) {
 	  tx_pin_val = 0; // bug fix to count stuffing bit	 
-	  
-	  if (_inverse_tx) {	  
-	    *_transmitPortRegister |= _transmitBitMask; 
-      } else {
-		*_transmitPortRegister &= ~_transmitBitMask;	   
-	  }
+	  *_transmitPortRegister &= ~_transmitBitMask;
     } else {	  
-	  tx_pin_val = 1; // bug fix to count stuffing bit	
-	  
-	  if (_inverse_tx) {	  
-	    *_transmitPortRegister &= ~_transmitBitMask;
-      } else {
-		*_transmitPortRegister |= _transmitBitMask;        
-	  }
+	  tx_pin_val = 1; // bug fix to count stuffing bit
+	  *_transmitPortRegister |= _transmitBitMask; 
     }
   } else {	  
-	if (_tx_pin_val) {
+	if (tx_pin_val) {
 	  *_transmitPortRegister |= _transmitBitMask;
     } else {      	  
 	  *_transmitPortRegister &= ~_transmitBitMask;
@@ -329,10 +314,7 @@ void BeanMPX::transmitAcknowledge() {
   
   uint8_t tx_pin_val;
   tx_pin_val = ack & l;
-  
-  if (_inverse_tx) {
-	tx_pin_val = !tx_pin_val;
-  }
+   
   
   if (tx_pin_val) {
 	*_transmitPortRegister |= _transmitBitMask;
@@ -385,11 +367,7 @@ void BeanMPX::setTimerCounter() {
 //	tx safety state
 //
 void BeanMPX::txSafetyState() {
-  if (_inverse_tx) {	
-    *_transmitPortRegister |= _transmitBitMask; // set tx pin HIGH  
-  } else {
-    *_transmitPortRegister &= ~_transmitBitMask; // set tx pin LOW  
-  }
+  *_transmitPortRegister &= ~_transmitBitMask; // set tx pin LOW   
 }
 
 
@@ -519,13 +497,12 @@ BeanMPX::BeanMPX() {
 //
 // Public methods
 //
-void BeanMPX::begin(uint8_t rx, uint8_t tx, bool use_timer2 = false, bool inverse_tx = false) {	  
+void BeanMPX::begin(uint8_t rx, uint8_t tx, bool use_timer2 = false) {	  
   #ifdef _DEBUG
   DDRD |= (1<<PD3) | (1<<PD4) | (1<<PD5);	// Debug Pins
   #endif
   
   _use_timer2 = use_timer2;
-  _inverse_tx = inverse_tx;
    
   if (_use_timer2) {
 	// Init Timer2 
@@ -587,7 +564,7 @@ uint8_t BeanMPX::available() {
 }
 
 
-void BeanMPX::sendMessage(const uint8_t *data, uint16_t datalen) {  
+void BeanMPX::sendMsg(const uint8_t *data, uint16_t datalen) {  
   uint8_t frame[datalen + 4];
   tx_s0 = 0;
   tx_s1 = 0;

@@ -100,8 +100,7 @@ class BeanMPX {
 		volatile uint16_t k = 0x80; // ack bit iterator
 		volatile bool is_transmit_ack = false;
 		volatile uint8_t ack = 0x40;
-		volatile uint16_t l = 0x80;
-		bool _inverse_tx = false;
+		volatile uint16_t l = 0x80;		
 
 		// static data
 		static BeanMPX *active_object;	
@@ -136,7 +135,7 @@ class BeanMPX {
 		// public methods
 		BeanMPX();  
 
-		void begin(uint8_t rx, uint8_t tx, bool use_timer2 = false, bool inverse_tx = false);
+		void begin(uint8_t rx, uint8_t tx, bool use_timer2 = false);
 		void ackMsg(const uint8_t *data, uint8_t len);		
 
 		bool isBusy() { 
