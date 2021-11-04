@@ -1,11 +1,12 @@
 #include <BeanMPX.h>
 
-#define RX_BUFFER_SIZE 18
+#define RX_BUFFER_SIZE 20
 #define TX_BUFFER_SIZE 15
 
 BeanMPX bean0;
 BeanMPX bean1;
 
+uint32_t current_millis = 0;
 uint32_t timer = 0;
 uint8_t g = 0;
 
@@ -48,35 +49,34 @@ void setup() {
 }
 
 void loop() {  
+   current_millis = millis();
 
   // listen for messages from 'Combination Meter' (1st bus)
   if (bean0.available()) {       
-    bean0_rx_index = 0;
-    while (bean0.available()) {      
-      bean0_rx_buffer[bean0_rx_index++] = bean0.read();
-      if (bean0_rx_index > RX_BUFFER_SIZE) { // safety
-        bean0_rx_index = 0;
-      }      
-    }
+    bean0.getMsg(bean0_rx_buffer, RX_BUFFER_SIZE);
 
 	// process received message
-    if (bean0_rx_buffer[2] == 0xFE) {
+    if (bean0_rx_buffer[4] == 0xFE) {
       bean0_send_buffer = true;
       bean0_tx_index = 0;
-      for (int i = 2; i < (bean0_rx_index - 3) && i < TX_BUFFER_SIZE; i++) {
+      for (int i = 4; i < (bean0_rx_index - 5) && i < TX_BUFFER_SIZE; i++) {
         bean0_tx_buffer[bean0_tx_index++] = bean0_rx_buffer[i];
       }      
     }
     
     // print received message
 	Serial.print("Bean0 - "); 
-	Serial.print(bean0.msgType()); 
+	Serial.print((char)bean0_rx_buffer[1]); 
     Serial.print(" ");
-    for (int i = 0; i < bean0_rx_index; i++) {
-	  Serial.print(bean0_rx_buffer[i], HEX); 
-	  Serial.print(" ");    
+    for (int i = 2; i < bean0_rx_buffer[0]+2; i++) {
+      if (bean0_rx_buffer[i] < 0x10) {
+        Serial.print(0, HEX); 
+      }
+      Serial.print(bean0_rx_buffer[i], HEX); 
+      Serial.print(" ");    
     }    
-    Serial.print("\n");        
+    Serial.print("\n");    
+    memset(bean0_rx_buffer, 0, RX_BUFFER_SIZE);       
   }
 
   // transmit processed message to 'ECU' (2nd bus)
@@ -88,10 +88,10 @@ void loop() {
   } 
 
   // transmit gear message to 1st bus
-  if (timer < millis()) {
+  if (current_millis - timer > 1000) {
     if (!bean0.isBusy()) {      
       bean0.sendMsg(gear, sizeof(gear));
-      timer = millis() + 1000;
+      timer = current_millis;
 	  
 	  // toggle gear manual mode
       gear[3] = 1 << g;
@@ -104,32 +104,30 @@ void loop() {
   
   // listen for messages from 'ECU' (2st bus)
   if (bean1.available()) {       
-    bean1_rx_index = 0;
-    while (bean1.available()) {      
-      bean1_rx_buffer[bean1_rx_index++] = bean1.read();
-      if (bean1_rx_index > RX_BUFFER_SIZE) { // safety
-        bean1_rx_index = 0;
-      }      
-    }
+    bean1.getMsg(bean1_rx_buffer, RX_BUFFER_SIZE);
 
 	// print received message
-    if (bean1_rx_buffer[2] == 0x62) {
+    if (bean1_rx_buffer[4] == 0x62) {
       bean1_send_buffer = true;
       bean1_tx_index = 0;
-      for (int i = 2; i < (bean1_rx_index - 3) && i < TX_BUFFER_SIZE; i++) {
+      for (int i = 4; i < (bean1_rx_index - 5) && i < TX_BUFFER_SIZE; i++) {
         bean1_tx_buffer[bean1_tx_index++] = bean1_rx_buffer[i];
       }      
     }
 
     // print received message
     Serial.print("Bean1 - "); 
-    Serial.print(bean1.msgType()); 
+	Serial.print((char)bean1_rx_buffer[1]); 
     Serial.print(" ");
-    for (int i = 0; i < bean1_rx_index; i++) {
-	  Serial.print(bean1_rx_buffer[i], HEX); 
-	  Serial.print(" ");    
+    for (int i = 2; i < bean1_rx_buffer[0]+2; i++) {
+      if (bean1_rx_buffer[i] < 0x10) {
+        Serial.print(0, HEX); 
+      }
+      Serial.print(bean1_rx_buffer[i], HEX); 
+      Serial.print(" ");    
     }    
-    Serial.print("\n"); 
+    Serial.print("\n");    
+    memset(bean1_rx_buffer, 0, RX_BUFFER_SIZE);   
   }
 
   // transmit processed message to 'Combination Meter' (1st bus)
