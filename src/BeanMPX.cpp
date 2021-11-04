@@ -74,29 +74,31 @@ void BeanMPX::storeReceivedBit(uint8_t rx_pin_val, bool no_stuffing_bit = false)
   i >>= 1;
 }
 
-void BeanMPX::storeReceivedByte() {
-  _receive_buffer[_buffer_index] = d;  
+void BeanMPX::storeReceivedByte() {  
+  _receive_buffer[_buffer_index] = d;   
   d = 0;
   i = 0x80;
   _buffer_index++;
   if (_buffer_index > BUFFER_SIZE) {
-    _buffer_index = 0;
-    is_listining = false;
-    msg_stage = 0;	
-  }
+	_buffer_index = 0;
+	is_listining = false;
+	msg_stage = 0;	  
+  }    
 }
 
-void BeanMPX::storeMessage(uint8_t *msg, uint8_t len) { // Store Message to mailbox
+void BeanMPX::storeMessage(uint8_t *msg, uint8_t len, uint8_t msg_type) { // Store Message to mailbox
   if (mailbox_fill_level < MAILBOX_SIZE) {
-	memcpy(mailbox[mailbox_fill_level], msg, len);
+	mailbox[mailbox_fill_level][0] = len;
+	mailbox[mailbox_fill_level][1] = msg_type;
+	memcpy(&mailbox[mailbox_fill_level][2], msg, len);
 	mailbox_fill_level++;
   }
 }
 
-void BeanMPX::getMessage(uint8_t *buffer, uint16_t buffer_len) {
-	uint8_t temp_msg[] = {0x01,0x62, 0xD2, 0x08, 0x10, 0x00, 0x7F};
-	memcpy(temp_msg, buffer, buffer_len);
-	for (int i = 0; i < mailbox_fill_level && i < MAILBOX_SIZE; i++) {
+void BeanMPX::getMessage(uint8_t *buffer, uint8_t buffer_len) {	
+	memcpy(buffer, mailbox[0], buffer_len); // get first from mail box
+	
+	for (int i = 0; i < mailbox_fill_level && i < MAILBOX_SIZE; i++) { // shift all messages up
 		memcpy(mailbox[i], mailbox[i+1], BUFFER_SIZE);
 	}
 	if (mailbox_fill_level > 0) {
@@ -112,104 +114,107 @@ void BeanMPX::receive() {
   if (is_transmitting) {
     return;
   }
+  
+  if (s0 > 7 || s1 > 7) {
+	_buffer_index = 0;
+	is_listining = false;
+	msg_stage = 0;	
+	return;
+  } 
 
   uint8_t rx_pin_val;
   rx_pin_val = *_receivePortRegister & _receiveBitMask;
 
   switch (msg_stage) {
-  case 0:
-    storeReceivedBit(rx_pin_val, true);
+    case 0:
+      storeReceivedBit(rx_pin_val, true);
 
-    if (!i) {
-      d &= 1;
-      storeReceivedByte();
-      msg_stage++;
-    }
-    break;
-  case 1:
-    storeReceivedBit(rx_pin_val);
-
-    if (!i) {
-      msg_length = d & 0x0f;
-      if (msg_length > 13) {
-        msg_stage = 0;
-        is_listining = false;
-		
-        *_timerInterruptMaskRegister = 0; // disable timer interrupts
-		
-        _buffer_index = 0;
+      if (!i) {
+        d &= 1;
+        storeReceivedByte();
+        msg_stage++;
       }
-      storeReceivedByte();
-      msg_stage++;
       break;
-    }
-    break;
-  case 2:
-    storeReceivedBit(rx_pin_val);
+    case 1:
+      storeReceivedBit(rx_pin_val);
 
-    if (!i) {
-      storeReceivedByte();
-      if (msg_length == 1) {
+      if (!i) {
+        msg_length = d & 0x0f;
+        if (msg_length > 13) {
+          msg_stage = 0;
+          is_listining = false;
+
+          *_timerInterruptMaskRegister = 0; // disable timer interrupts
+
+          _buffer_index = 0;
+        }
+        storeReceivedByte();
         msg_stage++;
         break;
       }
-      msg_length--;
-    }
-    break;
-  case 3:
-    storeReceivedBit(rx_pin_val);
-
-    if (!i) {
-      storeReceivedByte();
-      s0 = 0;
-      s1 = 0;
-      msg_stage++;
       break;
-    }
-    break;
-  case 4:
-    storeReceivedBit(rx_pin_val, true);
-    if (!i) {
-      if (checkcrc(_receive_buffer, _buffer_index) == 0) {
-        ack = 0x40;
-      } else {
-        ack = 0x80;
+    case 2:
+      storeReceivedBit(rx_pin_val);
+
+      if (!i) {
+        storeReceivedByte();
+        if (msg_length == 1) {
+          msg_stage++;
+          break;
+        }
+        msg_length--;
       }
-      if (d == 0x7E) {
-        for (int a = 0; a < sizeof(acknowledge_did); a++) {
-          if (_receive_buffer[2] == acknowledge_did[a]) {			 
-            is_transmit_ack = true;
-            a = sizeof(acknowledge_did);
+      break;
+    case 3:
+      storeReceivedBit(rx_pin_val);
+
+      if (!i) {
+        storeReceivedByte();
+        s0 = 0;
+        s1 = 0;
+        msg_stage++;
+        break;
+      }
+      break;
+    case 4:
+      storeReceivedBit(rx_pin_val, true);
+      if (!i) {
+        if (checkcrc(_receive_buffer, _buffer_index) == 0) {
+          ack = 0x40;
+        }
+        else {
+          ack = 0x80;
+        }
+        if (d == 0x7E) {
+          for (int a = 0; a < sizeof(acknowledge_did); a++) {
+            if (_receive_buffer[2] == acknowledge_did[a]) {
+              is_transmit_ack = true;
+              a = sizeof(acknowledge_did);
+            }
           }
         }
+        storeReceivedByte();
+        msg_stage++;
+        break;
       }
-      storeReceivedByte();
-      msg_stage++;
       break;
-    }
-    break;
-  case 5:
-    storeReceivedBit(rx_pin_val, true);
+    case 5:
+      storeReceivedBit(rx_pin_val, true);
 
-    if (!i || (i & 0x1f) > 0) {
-      storeReceivedByte();
-      
-	  *_timerInterruptMaskRegister = 0; // disable timer interrupt
-	  
-      msg_stage = 0;
-      is_listining = false;
+      if (!i || (i & 0x1f) > 0) {
+        storeReceivedByte();
 
-	  memcpy(msg, _receive_buffer, sizeof _receive_buffer);
-	  //storeMessage(_receive_buffer, sizeof(_receive_buffer));	  	    
-	  
-	  msg_index = 0;
-	  msg_len = _buffer_index;	  
-	  _buffer_index = 0;
-	  msg_type = 'R';
-	  
+        *_timerInterruptMaskRegister = 0; // disable timer interrupt
+
+        msg_stage = 0;
+        is_listining = false;
+
+        storeMessage(_receive_buffer, _buffer_index, 'R');
+        _buffer_index = 0;
+
+        break;
+      }
       break;
-    }
-    break;
   }
 }
 
@@ -228,14 +233,8 @@ void BeanMPX::receiveAcknowledge() {
   if (!k) {
     k = 0x80;
 	
-	memcpy(msg, _transmit_buffer, sizeof(_transmit_buffer));
-	//storeMessage(_transmit_buffer, sizeof(_transmit_buffer));
-	
-	msg[_tx_buffer_index] = rsp;
-	msg_index = 0;
-	msg_len = _tx_buffer_index + 1;	
-	msg_type = 'T';
-	
+	_transmit_buffer[_tx_buffer_index] = rsp;
+	storeMessage(_transmit_buffer, _tx_buffer_index + 1, 'T');	
 
     if (rsp != 0x40 && tx_retry) {
       _tx_buffer_index = 0;
@@ -375,22 +374,22 @@ void BeanMPX::syncPulse() {
 //  set timer counter
 //
 void BeanMPX::setTimerCounter() {
-	if (_use_timer2) {
-		TCNT2 = 104;		
-	} else {
-		TCNT1 = 830;
-	}
+  if (_use_timer2) {
+    TCNT2 = 104;		
+  } else {
+    TCNT1 = 830;
+  }
 }
 
 //
 //	tx safety state
 //
 void BeanMPX::txSafetyState() {
-	if (_inverse_tx) {	
-		*_transmitPortRegister |= _transmitBitMask; // set tx pin HIGH  
-	} else {
-		*_transmitPortRegister &= ~_transmitBitMask; // set tx pin LOW  
-	}
+  if (_inverse_tx) {	
+    *_transmitPortRegister |= _transmitBitMask; // set tx pin HIGH  
+  } else {
+    *_transmitPortRegister &= ~_transmitBitMask; // set tx pin LOW  
+  }
 }
 
 
@@ -581,34 +580,14 @@ void BeanMPX::ackMsg(const uint8_t *destintion_id, uint8_t len) {
 	memcpy(acknowledge_did, destintion_id, len);	
 }
 
-// Read from buffer
-uint8_t BeanMPX::available() {
-	return msg_len - msg_index;	
-}
 
 // Read from buffer
-uint8_t BeanMPX::available2() {
+uint8_t BeanMPX::available() {
 	return mailbox_fill_level;
 }
 
 
-char BeanMPX::msgType() {
-	return msg_type;	
-}
-
-
-uint8_t BeanMPX::read() {		
-	if (msg_index == msg_len) {		
-		return -1;
-	}
-	
-	uint8_t d = msg[msg_index]; // grab next byte
-	msg_index = (msg_index + 1) % BUFFER_SIZE;
-	return d;
-}
-
-
-void BeanMPX::sendMsg(const uint8_t *data, uint16_t datalen) {  
+void BeanMPX::sendMessage(const uint8_t *data, uint16_t datalen) {  
   uint8_t frame[datalen + 4];
   tx_s0 = 0;
   tx_s1 = 0;

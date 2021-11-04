@@ -108,13 +108,8 @@ class BeanMPX {
 		static BeanMPX *active_object2;	
 		
 		// Output data		
-		uint8_t mailbox[MAILBOX_SIZE][BUFFER_SIZE] = {0};
-		//uint8_t mailbox_index = 0; 
-		uint8_t mailbox_fill_level = 0; 
-		uint8_t msg[BUFFER_SIZE] = {0};
-		uint8_t msg_index = _buffer_index;
-		uint8_t msg_len = _buffer_index;
-		char msg_type;
+		uint8_t mailbox[MAILBOX_SIZE][BUFFER_SIZE+2] = {0};		
+		uint8_t mailbox_fill_level = 0; 		
 		
 	private:		
 		// private methods
@@ -125,7 +120,7 @@ class BeanMPX {
 		
 		void storeReceivedBit(uint8_t rx_pin_val, bool no_stuffing_bit = false);
 		void storeReceivedByte();	
-		void storeMessage(uint8_t *msg, uint8_t len);
+		void storeMessage(uint8_t *msg, uint8_t len, uint8_t msg_type = 0);
 		void receive();
 		void receiveAcknowledge();		
 		
@@ -142,20 +137,15 @@ class BeanMPX {
 		BeanMPX();  
 
 		void begin(uint8_t rx, uint8_t tx, bool use_timer2 = false, bool inverse_tx = false);
-		void ackMsg(const uint8_t *data, uint8_t len);
-
-		void sendMsg(const uint8_t *data, uint16_t datalen);
-		void sendMessage(const uint8_t *data, uint16_t datalen);
+		void ackMsg(const uint8_t *data, uint8_t len);		
 
 		bool isBusy() { 
 			return is_listining || is_transmitting; 
 		}
 
-		virtual uint8_t available();
-		virtual uint8_t available2();
-		virtual char msgType();
-		virtual uint8_t read();
-		void getMessage(uint8_t *buffer, uint16_t buffer_len);
+		virtual uint8_t available();		
+		void sendMsg(const uint8_t *data, uint16_t datalen);
+		void getMsg(uint8_t *buffer, uint8_t buffer_len);
 
 		// handlers
 		static inline void handle_rx();
