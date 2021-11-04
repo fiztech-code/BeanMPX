@@ -116,10 +116,12 @@ void BeanMPX::receive() {
   }
   
   if (s0 > 7 || s1 > 7) {
-	_buffer_index = 0;
-	is_listining = false;
-	msg_stage = 0;	
-	return;
+    _buffer_index = 0;
+    is_listining = false;
+    msg_stage = 0;	
+    s0 = 0;
+    s1 = 0;
+    return;
   } 
 
   uint8_t rx_pin_val;
