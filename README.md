@@ -34,7 +34,7 @@ Bean Multiplex repeated the message 3 times if no acknowledgement was received
 ![bean-mpx_serial-monitor.png](bean-mpx_serial-monitor.png)
 
 ### Receive
-Receive message is configured similar to arduino SoftwareSerial implemenatition.
+Receive message: memcpy into a buffer, 1st item is length of entire message, 2nd item is message type: R/T (Receive/Transmit), followed by entire bean frame. 
 
 ### Transmit
 Sending message, requires Destination id, Message id, and Data. Priority, Message length, CRC, and End of Message bytes will be generated.
