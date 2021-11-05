@@ -139,7 +139,7 @@ class BeanMPX {
 		void ackMsg(const uint8_t *data, uint8_t len);		
 
 		bool isBusy() { 
-			return is_listining || is_transmitting; 
+		  return is_listining || is_transmitting || is_receive_ack || is_transmit_ack; 
 		}
 
 		virtual uint8_t available();		
