@@ -108,8 +108,9 @@ class BeanMPX {
 		
 		// Output data		
 		uint8_t mailbox[MAILBOX_SIZE][BUFFER_SIZE+2] = {0};		
-		uint8_t mailbox_fill_level = 0; 		
-		
+		uint8_t mailbox_fill_level = 0; 
+
+		uint32_t busy_timeout = 0;		
 	private:		
 		// private methods
 		void pciSetup(byte pin);		
@@ -138,13 +139,19 @@ class BeanMPX {
 		void begin(uint8_t rx, uint8_t tx, bool use_timer2 = false);
 		void ackMsg(const uint8_t *data, uint8_t len);		
 
-		bool isBusy() { 
-		  return is_listining || is_transmitting || is_receive_ack || is_transmit_ack; 
+		bool isBusy() { 			
+			if (is_listining || is_transmitting || is_receive_ack || is_transmit_ack) {
+				return true;
+			}
+			
+			return (millis() - busy_timeout) < 2;
 		}
 
 		virtual uint8_t available();		
 		void sendMsg(const uint8_t *data, uint16_t datalen);
 		void getMsg(uint8_t *buffer, uint8_t buffer_len);
+		
+		uint8_t getStatus();
 
 		// handlers
 		static inline void handle_rx();

@@ -106,6 +106,10 @@ void BeanMPX::getMsg(uint8_t *buffer, uint8_t buffer_len) {
 	}
 }
 
+uint8_t BeanMPX::getStatus() {	
+	return mailbox_fill_level;
+}
+
 
 //
 // The receive routine called by the interrupt handler
@@ -116,12 +120,12 @@ void BeanMPX::receive() {
   }
   
   if (s0 > 7 || s1 > 7) {
-    _buffer_index = 0;
-    is_listining = false;
-    msg_stage = 0;	
-    s0 = 0;
-    s1 = 0;
-    return;
+	_buffer_index = 0;
+	is_listining = false;
+	msg_stage = 0;	
+	s0 = 0;
+	s1 = 0;
+	return;
   } 
 
   uint8_t rx_pin_val;
@@ -210,6 +214,7 @@ void BeanMPX::receive() {
 
         msg_stage = 0;
         is_listining = false;
+		busy_timeout = millis();
 
         storeMessage(_receive_buffer, _buffer_index, 'R');
         _buffer_index = 0;
@@ -247,6 +252,7 @@ void BeanMPX::receiveAcknowledge() {
       tx_retry = 2;
     }
     is_receive_ack = false;
+	busy_timeout = millis();
     rsp = 0;    
   }
 }
@@ -263,6 +269,7 @@ void BeanMPX::transmit() {
     } else {
       if (is_transmitting) {
         is_transmitting = false;
+		busy_timeout = millis();
         if (!is_listining) {
           *_timerInterruptMaskRegister = 0; // disable timer interrupt
         }
@@ -327,6 +334,7 @@ void BeanMPX::transmitAcknowledge() {
   l >>= 1;
   if (!l || (l & 0x1f) > 0) {
     is_transmit_ack = false;
+	busy_timeout = millis();
     l = 0x80; 
 	txSafetyState(); // safety
   }
